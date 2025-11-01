@@ -11,30 +11,32 @@
       padding: 0;
       background: #f0f0f0;
       font-family: Arial, sans-serif;
-      overflow: auto; /* ✅ aktifkan scroll penuh */
+      overflow: auto;
       height: 100%;
       width: 100%;
-      justify-content: center;
+      display: flex;
+      justify-content: center; /* ✅ Pusatkan konten horizontal */
     }
-
-    /* container utama melebar bebas */
+    
     #pdf-container {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* ✅ Pusatkan halaman PDF di tengah */
+      justify-content: center;
       padding: 20px;
-      align-items: center; 
-      width: max-content; /* ✅ biar lebar sesuai konten */
-      margin: 0;
+      max-width: 100%;
+      box-sizing: border-box;
     }
-
-    /* canvas tampil natural */
+    
     canvas {
       display: block;
-      margin: 0 auto 20px auto; /* jarak antar halaman */
+      margin-bottom: 20px;
       border: 1px solid #ccc;
       background-color: white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       border-radius: 6px;
     }
+
 
     .loading {
       text-align: center;
