@@ -6,82 +6,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: #f0f0f0;
-    font-family: Arial, sans-serif;
-    height: 100%;
-    overflow: hidden;
-  }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
 
-  /* Area utama viewer */
-  #pdf-viewer {
-    width: 100%;
-    height: 100vh;
-    overflow: auto;
-    background: #e0e0e0;
-    display: flex;
-    justify-content: center;   /* Tengah horizontal */
-    align-items: center;       /* Tengah vertikal */
-  }
+    /* Area utama viewer */
+    #pdf-viewer {
+      width: 100%;
+      height: 100vh;
+      overflow: auto;
+      background: #e0e0e0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-  /* Wrapper yang bisa di-zoom */
-  #pdf-wrapper {
-    transform-origin: center center;  /* Pusat zoom di tengah */
-    transition: transform 0.25s ease-out;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-  }
+    /* Wrapper PDF */
+    #pdf-wrapper {
+      transform-origin: center center;
+      transition: transform 0.25s ease-out;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
 
-  canvas {
-    background: white;
-    display: block;
-    margin: 10px 0;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    border: 1px solid #ccc;
-  }
+    canvas {
+      background: white;
+      display: block;
+      margin: 10px 0;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      border: 1px solid #ccc;
+      width: 100%;
+      height: auto;
+      max-width: 900px; /* batas maksimal di desktop */
+    }
 
-  #loading {
-    text-align: center;
-    margin-top: 20px;
-    color: #555;
-  }
+    #loading {
+      text-align: center;
+      margin-top: 20px;
+      color: #555;
+    }
 
-  /* Overlay anti screenshot */
-  #blackout {
-    position: fixed;
-    inset: 0;
-    background: black;
-    z-index: 9999;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-  #blackout.active {
-    opacity: 1;
-    pointer-events: all;
-  }
+    /* Overlay anti screenshot */
+    #blackout {
+      position: fixed;
+      inset: 0;
+      background: black;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #blackout.active {
+      opacity: 1;
+      pointer-events: all;
+    }
 
-  /* Popup peringatan */
-  #warning-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: white;
-    color: #222;
-    padding: 20px 30px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    font-size: 16px;
-    display: none;
-    z-index: 10000;
-  }
-</style>
+    /* Popup peringatan */
+    #warning-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      color: #222;
+      padding: 20px 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-size: 16px;
+      display: none;
+      z-index: 10000;
+    }
+
+    /* Responsif mobile */
+    @media (max-width: 768px) {
+      #pdf-wrapper {
+        padding: 5px;
+      }
+      canvas {
+        max-width: 100%;
+      }
+    }
+  </style>
 </head>
 <body oncontextmenu="return false">
   <div id="pdf-viewer">
@@ -93,7 +108,7 @@
   <div id="warning-popup">🚫 Screenshot tidak diizinkan!</div>
 
   <script>
-    const url = "Update konsumsi.pdf";
+    const url = "Update konsumsi.pdf"; // Ganti dengan nama file PDF kamu
 
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -111,18 +126,15 @@
       pdfDoc = pdf;
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        const scale = 2.0 * window.devicePixelRatio; // 🔥 HD scale
+
+        // 🔥 Skala otomatis (lebih kecil di mobile)
+        const scale = window.innerWidth < 768 ? 1.0 : 2.0;
         const viewport = page.getViewport({ scale });
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d", { alpha: false });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
-        canvas.style.width = `${viewport.width / window.devicePixelRatio}px`;
-        canvas.style.height = `${viewport.height / window.devicePixelRatio}px`;
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
 
         await page.render({ canvasContext: ctx, viewport }).promise;
         wrapper.appendChild(canvas);
