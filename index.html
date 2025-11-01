@@ -49,12 +49,11 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       border-radius: 6px;
       transition: transform 0.2s ease;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
     }
 
-    /* Tombol zoom disembunyikan sepenuhnya */
-    #controls {
-      display: none;
-    }
+    #controls { display: none; }
 
     #blackout {
       position: fixed;
@@ -92,7 +91,6 @@
     <div id="pdf-container"></div>
   </div>
 
-  <!-- Tombol zoom disembunyikan -->
   <div id="controls">
     <button id="zoom-out">-</button>
     <span id="zoom-level">100%</span>
@@ -124,24 +122,33 @@
     async function renderPage(pageNum) {
       const page = await pdfDoc.getPage(pageNum);
 
-      const baseViewport = page.getViewport({ scale: 1 });
+      // ==== PENINGKATAN KUALITAS DIMULAI DI SINI ====
       const deviceScale = window.devicePixelRatio || 1;
-
-      const scale = scaleFactor * deviceScale * 1.5;
+      const baseScale = 2.0; // resolusi dasar lebih tinggi
+      const scale = scaleFactor * deviceScale * baseScale;
       const viewport = page.getViewport({ scale });
+      // =================================================
 
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { alpha: false });
 
+      // Terapkan ukuran tinggi resolusi
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       canvas.style.width = (viewport.width / deviceScale) + "px";
       canvas.style.height = (viewport.height / deviceScale) + "px";
 
+      // Anti-burem setting
+      ctx.scale(deviceScale, deviceScale);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
-      const renderContext = { canvasContext: ctx, viewport: viewport };
+      const renderContext = {
+        canvasContext: ctx,
+        transform: [deviceScale, 0, 0, deviceScale, 0, 0],
+        viewport: viewport
+      };
+
       container.appendChild(canvas);
       await page.render(renderContext).promise;
     }
@@ -167,7 +174,6 @@
       }
     });
 
-    // fungsi zoom tetap aktif tapi tombol disembunyikan
     async function reloadPDF() {
       const centerX = wrapper.scrollLeft + wrapper.clientWidth / 2;
       const centerY = wrapper.scrollTop + wrapper.clientHeight / 2;
@@ -183,7 +189,6 @@
       wrapper.scrollTop = newCenterY - wrapper.clientHeight / 2;
     }
 
-    // Zoom via keyboard
     document.addEventListener("keydown", e => {
       const key = e.key.toLowerCase();
       if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || key === "f12") {
@@ -195,7 +200,6 @@
         triggerBlackout();
       }
 
-      // Zoom in/out pakai Ctrl + atau Ctrl -
       if (e.ctrlKey && (key === "=" || key === "+")) {
         e.preventDefault();
         if (scaleFactor < maxScale) {
