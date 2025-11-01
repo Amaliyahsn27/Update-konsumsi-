@@ -11,41 +11,51 @@
       padding: 0;
       background: #f0f0f0;
       font-family: Arial, sans-serif;
-      overflow: auto;
       height: 100%;
       width: 100%;
+      overflow: hidden;
       display: flex;
-      justify-content: center; /* ✅ Pusatkan konten horizontal */
+      justify-content: center;
+      align-items: center;
     }
-    
+
+    #pdf-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: #ddd;
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+
     #pdf-container {
       display: flex;
       flex-direction: column;
-      align-items: center; /* ✅ Pusatkan halaman PDF di tengah */
+      align-items: center;
       justify-content: center;
+      margin: 0 auto;
       padding: 20px;
-      max-width: 100%;
-      box-sizing: border-box;
+      background: #eee;
+      min-width: fit-content;
     }
-    
+
     canvas {
       display: block;
-      margin-bottom: 20px;
+      margin: 10px 0;
       border: 1px solid #ccc;
-      background-color: white;
+      background: white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       border-radius: 6px;
+      transition: transform 0.2s ease;
     }
 
-
-    .loading {
-      text-align: center;
-      color: #666;
-      margin: 20px;
-      font-size: 14px;
+    /* Tombol zoom disembunyikan sepenuhnya */
+    #controls {
+      display: none;
     }
 
-    /* Overlay hitam penuh */
     #blackout {
       position: fixed;
       inset: 0;
@@ -60,7 +70,6 @@
       pointer-events: all;
     }
 
-    /* Popup peringatan */
     #warning-popup {
       position: fixed;
       top: 50%;
@@ -78,8 +87,18 @@
   </style>
 </head>
 <body oncontextmenu="return false">
-  <div id="pdf-container"></div>
-  <div id="loading" class="loading">Memuat halaman...</div>
+
+  <div id="pdf-wrapper">
+    <div id="pdf-container"></div>
+  </div>
+
+  <!-- Tombol zoom disembunyikan -->
+  <div id="controls">
+    <button id="zoom-out">-</button>
+    <span id="zoom-level">100%</span>
+    <button id="zoom-in">+</button>
+  </div>
+
   <div id="blackout"></div>
   <div id="warning-popup">🚫 Screenshot tidak diizinkan!</div>
 
@@ -90,51 +109,50 @@
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
     const container = document.getElementById("pdf-container");
-    const loadingDiv = document.getElementById("loading");
+    const wrapper = document.getElementById("pdf-wrapper");
+    const zoomLevelSpan = document.getElementById("zoom-level");
     const blackout = document.getElementById("blackout");
     const popup = document.getElementById("warning-popup");
 
     let pdfDoc = null;
     let currentPage = 1;
     const batchSize = 2;
+    let scaleFactor = 1.0;
+    const minScale = 0.6;
+    const maxScale = 4.0;
 
-    function renderPage(pageNum, scaleFactor = 1.5) {
-      return pdfDoc.getPage(pageNum).then(page => {
-        const baseViewport = page.getViewport({ scale: 1 });
-        const deviceScale = window.devicePixelRatio || 1;
-        const scale = (900 * deviceScale * scaleFactor) / baseViewport.width;
-        const viewport = page.getViewport({ scale });
+    async function renderPage(pageNum) {
+      const page = await pdfDoc.getPage(pageNum);
 
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d", { alpha: false });
+      const baseViewport = page.getViewport({ scale: 1 });
+      const deviceScale = window.devicePixelRatio || 1;
 
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+      const scale = scaleFactor * deviceScale * 1.5;
+      const viewport = page.getViewport({ scale });
 
-        // tampil natural tanpa batas tengah
-        canvas.style.width = viewport.width / deviceScale + "px";
-        canvas.style.height = viewport.height / deviceScale + "px";
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { alpha: false });
 
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = (viewport.width / deviceScale) + "px";
+      canvas.style.height = (viewport.height / deviceScale) + "px";
 
-        container.appendChild(canvas);
-        const renderContext = { canvasContext: ctx, viewport: viewport };
-        return page.render(renderContext).promise;
-      });
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      const renderContext = { canvasContext: ctx, viewport: viewport };
+      container.appendChild(canvas);
+      await page.render(renderContext).promise;
     }
 
     async function renderBatch() {
       if (!pdfDoc) return;
-      loadingDiv.style.display = "block";
       const endPage = Math.min(currentPage + batchSize - 1, pdfDoc.numPages);
-
       for (let i = currentPage; i <= endPage; i++) {
         await renderPage(i);
       }
       currentPage = endPage + 1;
-      loadingDiv.textContent =
-        currentPage > pdfDoc.numPages ? "✅ Semua halaman selesai dimuat." : "⬇️ Scroll ke bawah untuk lanjut...";
     }
 
     pdfjsLib.getDocument(url).promise.then(pdf => {
@@ -142,9 +160,55 @@
       renderBatch();
     });
 
-    window.addEventListener("scroll", () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+    wrapper.addEventListener("scroll", (e) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.target;
+      if (scrollTop + clientHeight >= scrollHeight - 200) {
         if (currentPage <= pdfDoc.numPages) renderBatch();
+      }
+    });
+
+    // fungsi zoom tetap aktif tapi tombol disembunyikan
+    async function reloadPDF() {
+      const centerX = wrapper.scrollLeft + wrapper.clientWidth / 2;
+      const centerY = wrapper.scrollTop + wrapper.clientHeight / 2;
+      const oldScale = scaleFactor;
+
+      container.innerHTML = "";
+      currentPage = 1;
+      await renderBatch();
+
+      const newCenterX = centerX * (scaleFactor / oldScale);
+      const newCenterY = centerY * (scaleFactor / oldScale);
+      wrapper.scrollLeft = newCenterX - wrapper.clientWidth / 2;
+      wrapper.scrollTop = newCenterY - wrapper.clientHeight / 2;
+    }
+
+    // Zoom via keyboard
+    document.addEventListener("keydown", e => {
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || key === "f12") {
+        e.preventDefault();
+        alert("Aksi ini tidak diizinkan.");
+      }
+      if (key === "printscreen") {
+        e.preventDefault();
+        triggerBlackout();
+      }
+
+      // Zoom in/out pakai Ctrl + atau Ctrl -
+      if (e.ctrlKey && (key === "=" || key === "+")) {
+        e.preventDefault();
+        if (scaleFactor < maxScale) {
+          scaleFactor += 0.2;
+          reloadPDF();
+        }
+      }
+      if (e.ctrlKey && key === "-") {
+        e.preventDefault();
+        if (scaleFactor > minScale) {
+          scaleFactor -= 0.2;
+          reloadPDF();
+        }
       }
     });
 
@@ -154,20 +218,8 @@
       setTimeout(() => {
         blackout.classList.remove("active");
         popup.style.display = "none";
-      }, 5000);
+      }, 4000);
     }
-
-    document.addEventListener("keydown", e => {
-      const key = e.key.toLowerCase();
-      if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || ["f12"].includes(key)) {
-        e.preventDefault();
-        alert("Aksi ini tidak diizinkan.");
-      }
-      if (key === "printscreen") {
-        e.preventDefault();
-        triggerBlackout();
-      }
-    });
 
     let visibilityTimer;
     document.addEventListener("visibilitychange", () => {
