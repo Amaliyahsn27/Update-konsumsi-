@@ -13,31 +13,30 @@
       font-family: Arial, sans-serif;
       height: 100%;
       width: 100%;
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      overflow: auto; /* ✅ biarkan scroll alami, jangan dikunci */
     }
 
     #pdf-wrapper {
       position: relative;
       width: 100%;
-      height: 100%;
+      height: auto;
+      min-height: 100vh;
       overflow: auto;
       background: #ddd;
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      justify-content: center; /* ✅ tetap tengah horizontal */
+      align-items: flex-start; /* dari atas */
     }
 
     #pdf-container {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      margin: 0 auto;
+      justify-content: flex-start;
       padding: 10px;
       background: #eee;
+      min-width: fit-content;
+      box-sizing: border-box;
     }
 
     canvas {
@@ -47,7 +46,6 @@
       background: white;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       border-radius: 6px;
-      transition: transform 0.2s ease;
       max-width: 100%;
       height: auto;
       image-rendering: -webkit-optimize-contrast;
@@ -122,15 +120,13 @@
     async function renderPage(pageNum) {
       const page = await pdfDoc.getPage(pageNum);
 
-      // Lebar layar dan viewport halaman PDF
       const viewportBase = page.getViewport({ scale: 1 });
       const containerWidth = wrapper.clientWidth;
 
-      // Hitung skala otomatis berdasarkan layar (supaya tidak nge-zoom di HP)
+      // Hitung skala otomatis biar responsif
       let autoScale = containerWidth / viewportBase.width;
-      autoScale = Math.min(autoScale, 1.6); // biar gak terlalu besar di desktop
+      autoScale = Math.min(autoScale, 1.6);
 
-      // Gabungkan faktor zoom pengguna dan kualitas tinggi
       const deviceScale = window.devicePixelRatio || 1;
       const renderScale = autoScale * scaleFactor;
       const viewport = page.getViewport({ scale: renderScale * deviceScale });
@@ -138,14 +134,11 @@
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { alpha: false });
 
-      // Ukuran fisik tampilan (di layar)
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       canvas.style.width = (viewport.width / deviceScale) + "px";
       canvas.style.height = (viewport.height / deviceScale) + "px";
 
-      // Maksimalkan ketajaman
-      ctx.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
@@ -168,26 +161,21 @@
       renderBatch();
     });
 
-    wrapper.addEventListener("scroll", (e) => {
-      const { scrollTop, scrollHeight, clientHeight } = e.target;
+    wrapper.addEventListener("scroll", () => {
+      const { scrollTop, scrollHeight, clientHeight } = wrapper;
       if (scrollTop + clientHeight >= scrollHeight - 200) {
         if (currentPage <= pdfDoc.numPages) renderBatch();
       }
     });
 
     async function reloadPDF() {
-      const centerX = wrapper.scrollLeft + wrapper.clientWidth / 2;
-      const centerY = wrapper.scrollTop + wrapper.clientHeight / 2;
-      const oldScale = scaleFactor;
-
+      const oldScrollX = wrapper.scrollLeft;
+      const oldScrollY = wrapper.scrollTop;
       container.innerHTML = "";
       currentPage = 1;
       await renderBatch();
-
-      const newCenterX = centerX * (scaleFactor / oldScale);
-      const newCenterY = centerY * (scaleFactor / oldScale);
-      wrapper.scrollLeft = newCenterX - wrapper.clientWidth / 2;
-      wrapper.scrollTop = newCenterY - wrapper.clientHeight / 2;
+      wrapper.scrollLeft = oldScrollX;
+      wrapper.scrollTop = oldScrollY;
     }
 
     // Zoom via keyboard
@@ -227,14 +215,13 @@
       }, 4000);
     }
 
-    // Jika tab disembunyikan → tampilkan blackout
     let visibilityTimer;
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) visibilityTimer = setTimeout(triggerBlackout, 300);
       else clearTimeout(visibilityTimer);
     });
 
-    // Responsif: render ulang jika ukuran layar berubah
+    // Responsif jika ukuran layar berubah
     window.addEventListener("resize", () => {
       clearTimeout(window._resizeTimer);
       window._resizeTimer = setTimeout(() => {
