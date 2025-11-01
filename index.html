@@ -12,47 +12,47 @@
       background: #f0f0f0;
       font-family: Arial, sans-serif;
       height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: hidden;
     }
 
-    /* Wrapper agar selalu di tengah */
-    #pdf-wrapper {
+    /* Area utama viewer */
+    #pdf-viewer {
+      width: 100%;
+      height: 100vh;
+      overflow: auto;
+      background: #e0e0e0;
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      width: 100%;
-      padding: 30px 0;
-      transform-origin: top center;
-      transition: transform 0.25s ease-out;
     }
 
-    /* Container isi halaman PDF */
-    #pdf-container {
-      display: block;
-      width: max-content;
+    /* Wrapper yang bisa di-zoom */
+    #pdf-wrapper {
+      transform-origin: top left;
+      transition: transform 0.25s ease-out;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      min-width: max-content;
     }
 
     canvas {
-      display: block;
-      width: 100%;
-      height: auto !important;
-      margin: 10px auto;
       background: white;
-      border: 1px solid #ccc;
+      display: block;
+      margin: 10px 0;
       border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      border: 1px solid #ccc;
     }
 
-    .loading {
+    #loading {
       text-align: center;
-      color: #666;
-      margin: 20px;
-      font-size: 14px;
+      margin-top: 20px;
+      color: #555;
     }
 
-    /* Overlay hitam penuh */
+    /* Overlay anti screenshot */
     #blackout {
       position: fixed;
       inset: 0;
@@ -85,11 +85,11 @@
   </style>
 </head>
 <body oncontextmenu="return false">
-  <div id="pdf-wrapper">
-    <div id="pdf-container"></div>
+  <div id="pdf-viewer">
+    <div id="pdf-wrapper"></div>
   </div>
 
-  <div id="loading" class="loading">Memuat halaman...</div>
+  <div id="loading">📘 Memuat halaman...</div>
   <div id="blackout"></div>
   <div id="warning-popup">🚫 Screenshot tidak diizinkan!</div>
 
@@ -100,62 +100,51 @@
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
     const wrapper = document.getElementById("pdf-wrapper");
-    const container = document.getElementById("pdf-container");
-    const loadingDiv = document.getElementById("loading");
+    const loading = document.getElementById("loading");
     const blackout = document.getElementById("blackout");
     const popup = document.getElementById("warning-popup");
 
     let pdfDoc = null;
+    let zoomLevel = 1;
 
-    // Render halaman PDF
-    function renderPage(pageNum, scaleFactor = 1.6) {
-      return pdfDoc.getPage(pageNum).then(page => {
-        const baseViewport = page.getViewport({ scale: 1 });
-        const deviceScale = window.devicePixelRatio || 1;
-        const scale = (900 * deviceScale * scaleFactor) / baseViewport.width;
+    async function renderAllPages() {
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      pdfDoc = pdf;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const scale = 2.0 * window.devicePixelRatio; // 🔥 HD scale
         const viewport = page.getViewport({ scale });
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d", { alpha: false });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
+        canvas.style.width = `${viewport.width / window.devicePixelRatio}px`;
+        canvas.style.height = `${viewport.height / window.devicePixelRatio}px`;
 
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
 
-        container.appendChild(canvas);
-
-        const renderContext = { canvasContext: ctx, viewport: viewport };
-        return page.render(renderContext).promise;
-      });
-    }
-
-    // Render semua halaman (bukan batch)
-    async function renderAllPages() {
-      loadingDiv.style.display = "block";
-      for (let i = 1; i <= pdfDoc.numPages; i++) {
-        await renderPage(i);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        wrapper.appendChild(canvas);
       }
+      loading.textContent = "✅ Semua halaman selesai dimuat.";
     }
 
-    // Load dokumen
-    pdfjsLib.getDocument(url).promise.then(pdf => {
-      pdfDoc = pdf;
-      renderAllPages();
-    });
+    renderAllPages();
 
-    // Smooth zoom (Ctrl + Scroll)
-    let zoomLevel = 1;
-    window.addEventListener("wheel", e => {
+    /* Smooth zoom pakai Ctrl + Scroll */
+    const viewer = document.getElementById("pdf-viewer");
+    viewer.addEventListener("wheel", e => {
       if (e.ctrlKey) {
         e.preventDefault();
-        zoomLevel += e.deltaY * -0.0015;
-        zoomLevel = Math.min(Math.max(zoomLevel, 0.5), 2.5);
+        zoomLevel += e.deltaY * -0.002;
+        zoomLevel = Math.min(Math.max(zoomLevel, 0.5), 3.5);
         wrapper.style.transform = `scale(${zoomLevel})`;
       }
     });
 
-    // Fungsi blackout anti screenshot
+    /* Anti screenshot */
     function triggerBlackout() {
       blackout.classList.add("active");
       popup.style.display = "block";
@@ -165,7 +154,7 @@
       }, 4000);
     }
 
-    // Blokir tombol berbahaya
+    /* Blokir shortcut */
     document.addEventListener("keydown", e => {
       const key = e.key.toLowerCase();
       if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || key === "f12") {
@@ -178,7 +167,7 @@
       }
     });
 
-    // Deteksi tab hilang (indikasi rekam layar)
+    /* Deteksi tab berpindah (indikasi rekam layar) */
     let visibilityTimer;
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) visibilityTimer = setTimeout(triggerBlackout, 300);
