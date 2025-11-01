@@ -155,4 +155,21 @@
 
     document.addEventListener("keydown", e => {
       const key = e.key.toLowerCase();
-      if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || ["]()
+      if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || ["f12"].includes(key)) {
+        e.preventDefault();
+        alert("Aksi ini tidak diizinkan.");
+      }
+      if (key === "printscreen") {
+        e.preventDefault();
+        triggerBlackout();
+      }
+    });
+
+    let visibilityTimer;
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) visibilityTimer = setTimeout(triggerBlackout, 300);
+      else clearTimeout(visibilityTimer);
+    });
+  </script>
+</body>
+</html>
