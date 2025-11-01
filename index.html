@@ -6,83 +6,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #f0f0f0;
-      font-family: Arial, sans-serif;
-      height: 100%;
-      overflow: hidden;
-    }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #f0f0f0;
+    font-family: Arial, sans-serif;
+    height: 100%;
+    overflow: hidden;
+  }
 
-    /* Area utama viewer */
-    #pdf-viewer {
-      width: 100%;
-      height: 100vh;
-      overflow: auto;
-      background: #e0e0e0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-    }
+  /* Area utama viewer */
+  #pdf-viewer {
+    width: 100%;
+    height: 100vh;
+    overflow: auto;
+    background: #e0e0e0;
+    display: flex;
+    justify-content: center;   /* Tengah horizontal */
+    align-items: center;       /* Tengah vertikal */
+  }
 
-    /* Wrapper yang bisa di-zoom */
-    #pdf-wrapper {
-      transform-origin: top left;
-      transition: transform 0.25s ease-out;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-      min-width: max-content;
-    }
+  /* Wrapper yang bisa di-zoom */
+  #pdf-wrapper {
+    transform-origin: center center;  /* Pusat zoom di tengah */
+    transition: transform 0.25s ease-out;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
 
-    canvas {
-      background: white;
-      display: block;
-      margin: 10px 0;
-      border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      border: 1px solid #ccc;
-    }
+  canvas {
+    background: white;
+    display: block;
+    margin: 10px 0;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    border: 1px solid #ccc;
+  }
 
-    #loading {
-      text-align: center;
-      margin-top: 20px;
-      color: #555;
-    }
+  #loading {
+    text-align: center;
+    margin-top: 20px;
+    color: #555;
+  }
 
-    /* Overlay anti screenshot */
-    #blackout {
-      position: fixed;
-      inset: 0;
-      background: black;
-      z-index: 9999;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-    #blackout.active {
-      opacity: 1;
-      pointer-events: all;
-    }
+  /* Overlay anti screenshot */
+  #blackout {
+    position: fixed;
+    inset: 0;
+    background: black;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  #blackout.active {
+    opacity: 1;
+    pointer-events: all;
+  }
 
-    /* Popup peringatan */
-    #warning-popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      color: #222;
-      padding: 20px 30px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      font-size: 16px;
-      display: none;
-      z-index: 10000;
-    }
-  </style>
+  /* Popup peringatan */
+  #warning-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    color: #222;
+    padding: 20px 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    font-size: 16px;
+    display: none;
+    z-index: 10000;
+  }
+</style>
 </head>
 <body oncontextmenu="return false">
   <div id="pdf-viewer">
