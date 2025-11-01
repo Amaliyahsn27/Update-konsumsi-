@@ -124,7 +124,8 @@
         viewer.appendChild(canvas);
       }
 
-      loading.textContent = "✅ Semua halaman berhasil dimuat.";
+      // 🧹 Hilangkan indikator loading setelah selesai
+      loading.remove();
     }
 
     renderPDF();
