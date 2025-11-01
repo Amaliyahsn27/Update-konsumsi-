@@ -12,60 +12,54 @@
       background: #f0f0f0;
       font-family: Arial, sans-serif;
       height: 100%;
-      width: 100%;
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
-    /* ✅ Bungkus utama */
+    /* Wrapper agar selalu di tengah */
     #pdf-wrapper {
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      background: #f0f0f0;
-      min-height: 100vh;
       width: 100%;
+      padding: 30px 0;
+      transform-origin: top center;
+      transition: transform 0.25s ease-out;
     }
 
-    /* ✅ Kontainer PDF */
+    /* Container isi halaman PDF */
     #pdf-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      padding: 20px;
-      box-sizing: border-box;
-      width: 100%;
-      max-width: 950px; /* batas lebar biar proporsional */
+      display: block;
+      width: max-content;
     }
 
-    /* ✅ Tampilan halaman PDF */
     canvas {
       display: block;
       width: 100%;
       height: auto !important;
-      margin: 10px 0;
+      margin: 10px auto;
       background: white;
       border: 1px solid #ccc;
       border-radius: 6px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
     }
 
-    /* Loading */
     .loading {
       text-align: center;
-      color: #555;
-      font-size: 14px;
+      color: #666;
       margin: 20px;
+      font-size: 14px;
     }
 
-    /* Overlay hitam */
+    /* Overlay hitam penuh */
     #blackout {
       position: fixed;
       inset: 0;
       background: black;
+      z-index: 9999;
       opacity: 0;
       pointer-events: none;
-      z-index: 9999;
       transition: opacity 0.3s ease;
     }
     #blackout.active {
@@ -91,7 +85,6 @@
   </style>
 </head>
 <body oncontextmenu="return false">
-
   <div id="pdf-wrapper">
     <div id="pdf-container"></div>
   </div>
@@ -101,78 +94,69 @@
   <div id="warning-popup">🚫 Screenshot tidak diizinkan!</div>
 
   <script>
-    const url = "Update konsumsi.pdf";
+    const url = "PMA Nomor 13 Tahun 2021 - Penyelenggaraan Ibadah Haji Reguler.pdf";
 
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-    const container = document.getElementById("pdf-container");
     const wrapper = document.getElementById("pdf-wrapper");
+    const container = document.getElementById("pdf-container");
     const loadingDiv = document.getElementById("loading");
     const blackout = document.getElementById("blackout");
     const popup = document.getElementById("warning-popup");
 
     let pdfDoc = null;
-    let currentPage = 1;
-    const batchSize = 2;
 
-    /* ✅ Render halaman dengan skala dinamis */
-    async function renderPage(pageNum) {
-      const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1 });
+    // Render halaman PDF
+    function renderPage(pageNum, scaleFactor = 1.6) {
+      return pdfDoc.getPage(pageNum).then(page => {
+        const baseViewport = page.getViewport({ scale: 1 });
+        const deviceScale = window.devicePixelRatio || 1;
+        const scale = (900 * deviceScale * scaleFactor) / baseViewport.width;
+        const viewport = page.getViewport({ scale });
 
-      const containerWidth = container.clientWidth;
-      const scale = containerWidth / viewport.width;
-      const scaledViewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { alpha: false });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
 
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
 
-      const outputScale = window.devicePixelRatio || 1;
-      canvas.width = scaledViewport.width * outputScale;
-      canvas.height = scaledViewport.height * outputScale;
-      canvas.style.width = `${scaledViewport.width}px`;
-      canvas.style.height = `${scaledViewport.height}px`;
+        container.appendChild(canvas);
 
-      const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
-
-      const renderContext = {
-        canvasContext: ctx,
-        viewport: scaledViewport,
-        transform,
-      };
-
-      container.appendChild(canvas);
-      await page.render(renderContext).promise;
+        const renderContext = { canvasContext: ctx, viewport: viewport };
+        return page.render(renderContext).promise;
+      });
     }
 
-    /* ✅ Render batch halaman */
-    async function renderBatch() {
-      if (!pdfDoc) return;
+    // Render semua halaman (bukan batch)
+    async function renderAllPages() {
       loadingDiv.style.display = "block";
-      const endPage = Math.min(currentPage + batchSize - 1, pdfDoc.numPages);
-      for (let i = currentPage; i <= endPage; i++) {
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
         await renderPage(i);
       }
-      currentPage = endPage + 1;
-      loadingDiv.textContent =
-        currentPage > pdfDoc.numPages ? "✅ Semua halaman selesai dimuat." : "⬇️ Scroll ke bawah untuk lanjut...";
+      loadingDiv.textContent = "✅ Semua halaman selesai dimuat.";
     }
 
-    /* ✅ Load dokumen */
+    // Load dokumen
     pdfjsLib.getDocument(url).promise.then(pdf => {
       pdfDoc = pdf;
-      renderBatch();
+      renderAllPages();
     });
 
-    /* ✅ Scroll otomatis render batch berikutnya */
-    window.addEventListener("scroll", () => {
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-        if (currentPage <= pdfDoc.numPages) renderBatch();
+    // Smooth zoom (Ctrl + Scroll)
+    let zoomLevel = 1;
+    window.addEventListener("wheel", e => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        zoomLevel += e.deltaY * -0.0015;
+        zoomLevel = Math.min(Math.max(zoomLevel, 0.5), 2.5);
+        wrapper.style.transform = `scale(${zoomLevel})`;
       }
     });
 
-    /* ✅ Screenshot protection */
+    // Fungsi blackout anti screenshot
     function triggerBlackout() {
       blackout.classList.add("active");
       popup.style.display = "block";
@@ -182,6 +166,7 @@
       }, 4000);
     }
 
+    // Blokir tombol berbahaya
     document.addEventListener("keydown", e => {
       const key = e.key.toLowerCase();
       if ((e.ctrlKey && ["s", "p", "u", "c", "x", "a"].includes(key)) || key === "f12") {
@@ -194,6 +179,7 @@
       }
     });
 
+    // Deteksi tab hilang (indikasi rekam layar)
     let visibilityTimer;
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) visibilityTimer = setTimeout(triggerBlackout, 300);
