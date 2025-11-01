@@ -26,7 +26,7 @@
       overflow: auto;
       background: #ddd;
       display: flex;
-      justify-content: flex-start;
+      justify-content: center;
       align-items: flex-start;
     }
 
@@ -36,13 +36,18 @@
       align-items: center;
       justify-content: center;
       margin: 0 auto;
-      padding: 20px;
+      padding: 10px;
       background: #eee;
-      min-width: fit-content;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     canvas {
       display: block;
+      width: 100%;
+      height: auto;
+      max-width: 100%;
       margin: 10px 0;
       border: 1px solid #ccc;
       background: white;
@@ -108,7 +113,6 @@
 
     const container = document.getElementById("pdf-container");
     const wrapper = document.getElementById("pdf-wrapper");
-    const zoomLevelSpan = document.getElementById("zoom-level");
     const blackout = document.getElementById("blackout");
     const popup = document.getElementById("warning-popup");
 
@@ -119,33 +123,38 @@
     const minScale = 0.6;
     const maxScale = 4.0;
 
+    // Hitung skala dasar berdasarkan ukuran layar (supaya responsif)
+    function getBaseScale() {
+      const isMobile = window.innerWidth <= 768;
+      const isTablet = window.innerWidth > 768 && window.innerWidth <= 1200;
+      if (isMobile) return 1.0;
+      if (isTablet) return 1.3;
+      return 1.6; // desktop
+    }
+
     async function renderPage(pageNum) {
       const page = await pdfDoc.getPage(pageNum);
 
-      // ==== PENINGKATAN KUALITAS DIMULAI DI SINI ====
-      const deviceScale = window.devicePixelRatio || 1;
-      const baseScale = 2.0; // resolusi dasar lebih tinggi
-      const scale = scaleFactor * deviceScale * baseScale;
+      const deviceScale = Math.min(window.devicePixelRatio || 1.5, 2.5);
+      const baseScale = getBaseScale();
+      const scale = scaleFactor * baseScale;
       const viewport = page.getViewport({ scale });
-      // =================================================
 
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { alpha: false });
 
-      // Terapkan ukuran tinggi resolusi
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      canvas.style.width = (viewport.width / deviceScale) + "px";
-      canvas.style.height = (viewport.height / deviceScale) + "px";
+      const outputScale = deviceScale * 1.2;
+      canvas.width = viewport.width * outputScale;
+      canvas.height = viewport.height * outputScale;
+      canvas.style.width = viewport.width + "px";
+      canvas.style.height = viewport.height + "px";
 
-      // Anti-burem setting
-      ctx.scale(deviceScale, deviceScale);
+      ctx.scale(outputScale, outputScale);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
       const renderContext = {
         canvasContext: ctx,
-        transform: [deviceScale, 0, 0, deviceScale, 0, 0],
         viewport: viewport
       };
 
@@ -175,18 +184,9 @@
     });
 
     async function reloadPDF() {
-      const centerX = wrapper.scrollLeft + wrapper.clientWidth / 2;
-      const centerY = wrapper.scrollTop + wrapper.clientHeight / 2;
-      const oldScale = scaleFactor;
-
       container.innerHTML = "";
       currentPage = 1;
       await renderBatch();
-
-      const newCenterX = centerX * (scaleFactor / oldScale);
-      const newCenterY = centerY * (scaleFactor / oldScale);
-      wrapper.scrollLeft = newCenterX - wrapper.clientWidth / 2;
-      wrapper.scrollTop = newCenterY - wrapper.clientHeight / 2;
     }
 
     document.addEventListener("keydown", e => {
@@ -229,6 +229,14 @@
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) visibilityTimer = setTimeout(triggerBlackout, 300);
       else clearTimeout(visibilityTimer);
+    });
+
+    // Render ulang otomatis saat ukuran layar berubah
+    window.addEventListener("resize", () => {
+      clearTimeout(window._resizeTimer);
+      window._resizeTimer = setTimeout(() => {
+        reloadPDF();
+      }, 300);
     });
   </script>
 </body>
